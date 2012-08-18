@@ -1,0 +1,90 @@
+#!/bin/bash
+temp_path=$HOME
+file_saved=$temp_path/temp_deb_saved_status.list
+file_current=$temp_path/temp_deb_current_status.list
+
+show_help()
+{
+	echo "USAGE: debrestore snapshot_to_restore"
+	echo "Опции:"
+	echo " -f не задавать вопросов"
+	echo " -s только показать, что нужно установить/удалить"
+	echo " -q не показывать, что нужно установить/удалить, сразу выполнить это"
+	echo " -h --help вывести справку"
+}
+if [ $1 = "--help" ]
+then
+	show_help
+	exit 0
+fi
+
+while getopts fsqhV c
+do
+
+	case $c in
+f) forceflag=1;;
+s) showflag=1;;
+q) quietflag=1;;
+h)show_help;;
+V) echo "Version 0.0.1"
+		exit 0;;
+?)	echo "USAGE: debrestore snapshot_to_restore";;
+	esac
+done
+shift $(($OPTIND - 1))
+if [ ! -r $1 ]
+then
+	echo "USAGE: debrestore snapshot_to_restore"
+	exit 1
+fi
+cat $1 | gunzip > $file_saved
+dpkg -l | awk '/^ii/{print $2}' > $file_current
+pkg_to_install=`cat $file_saved | grep -xv -f $file_current`
+pkg_to_remove=`cat $file_current | grep -xv -f $file_saved`
+if [ -z $quietflag ]
+then
+	n_to_install=`echo $pkg_to_install | wc -w`
+	if [ $n_to_install -gt 0 ]
+	then
+		echo "Установить пакеты:"
+		echo $pkg_to_install
+		echo "(всего $n_to_install пакетов)"
+	else
+		echo "Установки пакетов не требуется"
+	fi
+	n_to_remove=`echo $pkg_to_remove | wc -w`
+	if [ $n_to_remove -gt 0 ]
+	then
+		echo "Удалить пакеты:"
+		echo $pkg_to_remove
+		echo "(всего $n_to_remove пакетов)"
+	else
+		echo "Удаления пакетов не требуется"
+	fi	
+fi
+n_all=$(($n_to_install+$n_to_remove))
+if [ $n_all -gt 0 ]
+then
+	if [ -n $forceflag ] && [ -n $showflag ]
+	then
+		echo "Сделать это [y/n]?"
+		read answer
+	fi
+	if [ ! -z $forceflag ]
+	then	
+		answer=y
+	fi
+	if [ ! -z $showflag ]
+	then
+		answer=n
+	fi
+	if  echo $answer | grep y > /dev/null
+	then
+		apt-get -y install $pkg_to_install
+		apt-get -y remove $pkg_to_remove
+
+	fi
+fi
+rm $file_saved
+rm $file_current
+

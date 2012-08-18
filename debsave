@@ -1,0 +1,15 @@
+#!/bin/bash
+if [ -z $1 ]
+then
+	dt=`date +%y%m%d%H%M`
+	filename="debsnapshot_$dt"
+else
+	filename=$1
+fi
+if [ ! -w . ]
+then
+	echo "Невозможно сохранить файл $filename"
+fi
+dpkg -l | awk '/^ii/{print $2}' | gzip > $filename
+echo "Информация о состоянии сохранена в файл $filename"
+
